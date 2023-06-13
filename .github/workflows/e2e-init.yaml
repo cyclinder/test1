@@ -145,6 +145,8 @@ jobs:
         run: |
           docker pull ghcr.io/cyclinder/test1/controller:dev-race
           docker pull ghcr.io/cyclinder/test1/agent:dev-race
+          docker pull ghcr.io/cyclinder/test2/agent:dev
+          docker pull ghcr.io/cyclinder/test2/controller:dev
 
       # test against commit version
       - name: Setup Kind Cluster

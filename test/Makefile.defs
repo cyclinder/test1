@@ -17,7 +17,7 @@ E2E_IP_FAMILY ?= dual
 # kubernetes version
 E2E_KIND_IMAGE_TAG ?= v1.27.1
 # with kind default version
-# E2E_KIND_IMAGE_TAG ?=
+# E2E_KIND_IMAGE_TAG ?= 
 
 # disable default cni, default true
 E2E_DISABLE_DEFAULT_CNI ?= true
@@ -31,6 +31,10 @@ INSTALL_MULTUS ?= true
 INSTALL_KRUISE ?= true
 
 INSTALL_DEFAULT_CNI ?= true
+
+INSTALL_CALICO ?= true
+
+INSTALL_CILIUM ?= false
 
 INSTALL_SPIDERDOCTOR ?= true
 
@@ -47,7 +51,7 @@ RELEASE_NAME ?= spiderpool
 RELEASE_NAMESPACE ?= kube-system
 
 # multi flag separated by commas,like setup,ippool
-E2E_GINKGO_LABELS ?=
+E2E_GINKGO_LABELS ?= 
 
 GINKGO_OPTION ?=
 

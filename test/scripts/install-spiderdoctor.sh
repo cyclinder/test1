@@ -71,8 +71,8 @@ for IMAGE in ${HELM_IMAGES_LIST}; do
 done
 
 # Install SPIDERDOCTOR
-helm upgrade --install spiderdoctor spiderdoctor/spiderdoctor -n kube-system --wait --debug --kubeconfig ${E2E_KUBECONFIG} ${SPIDERDOCTOR_HELM_OPTIONS} --version ${SPIDERDOCTOR_VERSION}  || kubectl describe po -n kube-system -l app.kubernetes.io/name=spiderdoctor --kubeconfig ${E2E_KUBECONFIG} 
-kubectl wait --for=condition=ready -l app.kubernetes.io/name=spiderdoctor --timeout= pod -n kube-system \
---kubeconfig ${E2E_KUBECONFIG} || kubectl describe po -n kube-system -l app.kubernetes.io/name=spiderdoctor --kubeconfig ${E2E_KUBECONFIG} && echo "spiderdoctor failed" && exit 1
+helm upgrade --install spiderdoctor spiderdoctor/spiderdoctor -n kube-system  --debug --kubeconfig ${E2E_KUBECONFIG} ${SPIDERDOCTOR_HELM_OPTIONS} --version ${SPIDERDOCTOR_VERSION}  
+kubectl wait --for=condition=ready -l app.kubernetes.io/component=spiderdoctor-agent --timeout=100s pod -n kube-system \
+--kubeconfig ${E2E_KUBECONFIG} 
 
 echo -e "\033[35m Succeed to install spiderdoctor \033[0m"

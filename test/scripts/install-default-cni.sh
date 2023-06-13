@@ -21,6 +21,12 @@ echo "$CURRENT_FILENAME : E2E_CLUSTER_NAME $E2E_CLUSTER_NAME "
 [ -z "$E2E_KUBECONFIG" ] && echo "error, miss E2E_KUBECONFIG " && exit 1
 [ ! -f "$E2E_KUBECONFIG" ] && echo "error, could not find file $E2E_KUBECONFIG " && exit 1
 
+[ -z "$INSTALL_CALICO" ] && echo "error, miss INSTALL_CALICO " && exit 1
+echo "$CURRENT_FILENAME : INSTALL_CALICO $INSTALL_CALICO "
+
+[ -z "$INSTALL_CILIUM" ] && echo "error, miss INSTALL_CILIUM " && exit 1
+echo "$CURRENT_FILENAME : INSTALL_CILIUM $INSTALL_CILIUM "
+
 [ -z "$CLUSTER_PATH" ] && echo "error, miss CLUSTER_PATH" && exit 1
 echo "$CURRENT_FILENAME : CLUSTER_PATH $CLUSTER_PATH "
 
@@ -161,7 +167,13 @@ function install_cilium() {
     echo -e "\033[35m ===> Succeed to install cilium \033[0m"
 }
 
-install_calico
-install_cilium
+if [ "${INSTALL_CALICO}" == "true" ] ; then
+  install_calico
+fi
+
+if [ "${INSTALL_CILIUM}" == "true" ] ; then
+  install_cilium
+fi
+
 
 kubectl get po -n kube-system --kubeconfig ${E2E_KUBECONFIG} -owide
