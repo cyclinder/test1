@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/component: spiderdoctor
+  name: spiderdoctor
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: spiderdoctor
+  template:
+    metadata:
+      annotations:
+        ipam.spidernet.io/subnet: '{"interface": "net1","ipv4": ["vlan100-v4"] ,"ipv6": ["vlan100-v6"]}'
+        k8s.v1.cni.cncf.io/networks: kube-system/macvlan-vlan100-overlay
+        v1.multus-cni.io/default-network: kube-system/k8s-pod-network
+      labels:
+        app.kubernetes.io/component: spiderdoctor
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/os
+                operator: In
+                values:
+                - linux
+            - matchExpressions:
+              - key: beta.kubernetes.io/os
+                operator: In
+                values:
+                - linux
+      containers:
+      - args:
+        - --app-mode=true
+        command:
+        - /usr/bin/agent
+        env:
+        - name: ENV_LOG_LEVEL
+          value: info
+        - name: ENV_ENABLED_METRIC
+          value: "false"
+        - name: ENV_METRIC_HTTP_PORT
+          value: "5711"
+        - name: ENV_HTTP_PORT
+          value: "80"
+        - name: ENV_GOPS_LISTEN_PORT
+          value: "5712"
+        - name: ENV_AGENT_GRPC_LISTEN_PORT
+          value: "3000"
+        - name: ENV_CLUSTER_DNS_DOMAIN
+          value: cluster.local
+        - name: ENV_ENABLE_AGGREGATE_AGENT_REPORT
+          value: "true"
+        - name: ENV_AGENT_REPORT_STORAGE_PATH
+          value: /report
+        - name: ENV_CLEAN_AGED_REPORT_INTERVAL_IN_MINUTE
+          value: "10"
+        - name: ENV_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: ENV_LOCAL_NODE_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: ENV_LOCAL_NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: ENV_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        image: ghcr.io/spidernet-io/spiderdoctor-agent:v0.3.0
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthy/liveness
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        name: spiderdoctor-agent
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthy/readiness
+            port: 80
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /healthy/startup
+            port: 80
+            scheme: HTTP
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /report
+          name: report-data
+      nodeSelector:
+        kubernetes.io/os: linux
+      volumes:
+      - hostPath:
+          path: /var/run/spiderdoctor/agent
+          type: DirectoryOrCreate
+        name: report-data

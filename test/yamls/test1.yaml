@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: macvlan-overlay
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: macvlan-overlay
+  template:
+    metadata:
+      annotations:
+        #ipam.spidernet.io/subnets: '[{"interface":"net1","ipv4":["vlan100-v4"],"ipv6":["vlan100-v6"]}]'
+        v1.multus-cni.io/default-network: kube-system/k8s-pod-network
+        k8s.v1.cni.cncf.io/networks: kube-system/macvlan-vlan100-overlay
+      labels:
+        app: macvlan-overlay
+    spec:
+      containers:
+      - args:
+        - --app-mode=true
+        command:
+        - /usr/bin/agent
+        image: ghcr.io/spidernet-io/spiderdoctor-agent:v0.3.0
+        imagePullPolicy: IfNotPresent
+        name: container-2
+        resources:
+          limits:
+            cpu: 250m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 512Mi
