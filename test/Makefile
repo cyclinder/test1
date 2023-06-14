@@ -13,7 +13,6 @@ e2e:  kind-init e2e-test
 
 .PHONY: kind-init
 kind-init: check_env prepare
-	cat /etc/docker/daemon.json
 	@echo -e "\033[35m [Step 3] Init kind for the cluster: $(E2E_CLUSTER_NAME) \033[0m"
 	make setup_kind
 	@echo -e "\033[35m [Step 4] Init network config for kind-node \033[0m"
@@ -47,21 +46,17 @@ endif
 ifeq ($(INSTALL_MULTUS),true)
 	@echo -e "\033[35m [Step 8] Install Multus \033[0m"
 	@ IMAGE_MULTUS=$(IMAGE_MULTUS_NAME) \
-		E2E_IP_FAMILY=$(E2E_IP_FAMILY) \
-		MULTUS_DEFAULT_CNI_NAME=$(MULTUS_DEFAULT_CNI_VLAN0) \
-		MULTUS_DEFAULT_CNI_CALICO=$(MULTUS_DEFAULT_CNI_CALICO) \
-		MULTUS_DEFAULT_CNI_CILIUM=$(MULTUS_DEFAULT_CNI_CILIUM) \
-		MULTUS_DEFAULT_CNI_VLAN100=$(MULTUS_DEFAULT_CNI_VLAN100) \
-		MULTUS_DEFAULT_CNI_VLAN200=$(MULTUS_DEFAULT_CNI_VLAN200) \
-		MULTUS_ADDITIONAL_CNI_VLAN100=$(MULTUS_ADDITIONAL_CNI_VLAN100) \
-		MULTUS_ADDITIONAL_CNI_VLAN200=$(MULTUS_ADDITIONAL_CNI_VLAN200) \
-		MULTUS_CNI_NAMESPACE=$(MULTUS_CNI_NAMESPACE) \
-		CLUSTER_PATH=$(CLUSTER_DIR)/$(E2E_CLUSTER_NAME) \
-		scripts/install-multus.sh $(E2E_CLUSTER_NAME) $(E2E_KUBECONFIG)
-endif
-ifeq ($(INSTALL_KRUISE),true)
-	@echo -e "\033[35m [Step 9] Install third-party controllers: kurise \033[0m"
-	@ make setup_kurise
+	E2E_IP_FAMILY=$(E2E_IP_FAMILY) \
+	MULTUS_DEFAULT_CNI_NAME=$(MULTUS_DEFAULT_CNI_VLAN0) \
+	MULTUS_DEFAULT_CNI_CALICO=$(MULTUS_DEFAULT_CNI_CALICO) \
+	MULTUS_DEFAULT_CNI_CILIUM=$(MULTUS_DEFAULT_CNI_CILIUM) \
+	MULTUS_DEFAULT_CNI_VLAN100=$(MULTUS_DEFAULT_CNI_VLAN100) \
+	MULTUS_DEFAULT_CNI_VLAN200=$(MULTUS_DEFAULT_CNI_VLAN200) \
+	MULTUS_ADDITIONAL_CNI_VLAN100=$(MULTUS_ADDITIONAL_CNI_VLAN100) \
+	MULTUS_ADDITIONAL_CNI_VLAN200=$(MULTUS_ADDITIONAL_CNI_VLAN200) \
+	MULTUS_CNI_NAMESPACE=$(MULTUS_CNI_NAMESPACE) \
+	CLUSTER_PATH=$(CLUSTER_DIR)/$(E2E_CLUSTER_NAME) \
+	scripts/install-multus.sh $(E2E_CLUSTER_NAME) $(E2E_KUBECONFIG)
 endif
 ifeq ($(INSTALL_SPIDERDOCTOR),true)
 	@echo -e "\033[35m [Step 10] Install SpiderDoctor \033[0m"
@@ -73,12 +68,6 @@ ifeq ($(INSTALL_SPIDERDOCTOR),true)
 	SPIDERDOCTOR_IMAGE_REPO=$(SPIDERDOCTOR_IMAGE_REPO) \
 	$(QUIET) bash scripts/install-spiderdoctor.sh
 endif
-	-$(QUIET) kubectl --kubeconfig $(E2E_KUBECONFIG) delete namespace local-path-storage --force --timeout=10s  &>/dev/null
-	- DNS_POD_LIST=` kubectl --kubeconfig $(E2E_KUBECONFIG) get pods --no-headers  -n kube-system --selector k8s-app=kube-dns --output jsonpath={.items[*].metadata.name} ` ; \
- 		for POD in $${DNS_POD_LIST} ; do \
- 			echo "restart coredns pod $${POD} " ; \
- 			kubectl --kubeconfig $(E2E_KUBECONFIG) delete pod $${POD} -n kube-system --force --timeout=10s ; \
- 		done
 	@ echo "wait for the cluster ready" ; \
 		TEST_IMAGE=$(TEST_IMAGE_NAME) \
 		MULTUS_CNI_NAMESPACE=$(MULTUS_CNI_NAMESPACE) \
@@ -109,7 +98,6 @@ setup_kind:
 	-@ rm -rf $(CLUSTER_DIR)/$(E2E_CLUSTER_NAME)
 	- sudo sysctl -w fs.inotify.max_user_watches=524288 || true
 	- sudo sysctl -w fs.inotify.max_user_instances=8192 || true
-	- sudo sysctl net.ipv6.conf.all.disable_ipv6
 	- sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
 	$(QUIET) mkdir -p -v $(CLUSTER_DIR)/$(E2E_CLUSTER_NAME)
 	$(QUIET) kube_proxy_mode=$(E2E_KUBE_PROXY_MODE) ip_family=$(E2E_IP_FAMILY) \
@@ -159,10 +147,6 @@ setup_spiderpool:
 		for i in $(SPIDERPOOL_IMAGES); do \
 			kind load docker-image $${i}:$(TEST_IMAGE_TAG) --name $(E2E_CLUSTER_NAME);	\
 		done; \
-        # docker pull ghcr.io/cyclinder/test1/controller:dev-race ; \
-        docker pull ghcr.io/cyclinder/test2/agent:dev  ; \
-        # kind load docker-image ghcr.io/cyclinder/test1/controller:dev-race --name $(E2E_CLUSTER_NAME); \
-        kind load docker-image ghcr.io/cyclinder/test2/agent:dev --name $(E2E_CLUSTER_NAME); \
 		if [ "$(USE_TLS_METHOD)" == "certmanager" ] ; then \
 			echo "USE_TLS_METHOD $(USE_TLS_METHOD) " ; \
 			$(QUIET) IMAGE_CERT_MANAGER="$(IMAGE_CERT_MANAGER_NAME)" scripts/install-cert-manager.sh "$(E2E_CLUSTER_NAME)" "$(CERT_MANAGER_ISSUER_NAME)" ; \
@@ -335,11 +319,8 @@ e2e_test:
 		$(ROOT_DIR)/tools/scripts/ginkgo.sh \
 			--race --timeout=$(E2E_TIMEOUT) --output-interceptor-mode=none --poll-progress-after=120s --poll-progress-interval=30s \
 			--json-report e2ereport.json --output-dir $(ROOT_DIR) --procs $(E2E_GINKGO_PROCS) -gcflags=-l \
-			--label-filter="overlay" -randomize-suites -randomize-all  -vv --fail-fast  $(GINKGO_OPTION) \
+			--label-filter="$(E2E_GINKGO_LABELS)" -randomize-suites -randomize-all  -vv --fail-fast  $(GINKGO_OPTION) \
 			-r e2e/*  || RESULT=1  ; \
-		kubectl get po -n kube-system --kubeconfig $(E2E_KUBECONFIG) -o wide ; \
-		kubectl describe po -n kube-system -l app.kubernetes.io/component=spiderdoctor-agent --kubeconfig $(E2E_KUBECONFIG) ; \
-		exit  $${RESULT}; \
 		echo "=========== after test `date` ===========" >> $(E2E_LOG_FILE) ; \
 		./scripts/debugEnv.sh $(E2E_KUBECONFIG) "system" "$(E2E_LOG_FILE)" ; \
 		KIND_CLUSTER_NAME=$(E2E_CLUSTER_NAME) ./scripts/debugEnv.sh $(E2E_KUBECONFIG) "detail" "$(E2E_LOG_FILE)" ; \
@@ -353,17 +334,6 @@ e2e_test:
 		echo "succeeded to run all test" ; \
 		echo "output report to e2ereport.json" ; \
 		echo "output env log to $(E2E_LOG_FILE) "
-
-
-
-.PHONY: test
-test:
-	kubectl apply -f yamls/test2.yaml -n kube-system --kubeconfig $(E2E_KUBECONFIG) ; \
-	kubectl wait --for=condition=ready -l app=macvlan-overlay -n kube-system --timeout=60s pod --kubeconfig $(E2E_KUBECONFIG) || true ; \
-	kubectl describe po -l app=macvlan-overlay -n kube-system --kubeconfig $(E2E_KUBECONFIG) ; \
-	kubectl apply -f yamls/test1.yaml -n kube-system --kubeconfig $(E2E_KUBECONFIG) ; \
-	kubectl wait --for=condition=ready -l app.kubernetes.io/component=spiderdoctor -n kube-system --timeout=60s pod --kubeconfig $(E2E_KUBECONFIG) || true ; \
-	kubectl describe po -l app.kubernetes.io/component=spiderdoctor -n kube-system --kubeconfig $(E2E_KUBECONFIG)
 
 .PHONY: usage
 usage:

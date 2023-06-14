@@ -34,7 +34,7 @@ INSTALL_DEFAULT_CNI ?= true
 
 INSTALL_CALICO ?= true
 
-INSTALL_CILIUM ?= false
+INSTALL_CILIUM ?= true
 
 INSTALL_SPIDERDOCTOR ?= true
 
@@ -42,7 +42,7 @@ INSTALL_NETTOOLS ?= false
 
 CALICO_VERSION ?= v3.25.0
 
-CNI_PACKAGE_VERSION ?= v1.2.0
+CNI_PACKAGE_VERSION ?= v1.3.0
 
 #============ ginkgo-custom-flag ====================
 E2E_CLUSTER_NAME ?= spider
@@ -51,13 +51,13 @@ RELEASE_NAME ?= spiderpool
 RELEASE_NAMESPACE ?= kube-system
 
 # multi flag separated by commas,like setup,ippool
-E2E_GINKGO_LABELS ?= 
+E2E_GINKGO_LABELS ?=
 
 GINKGO_OPTION ?=
 
 E2E_TIMEOUT ?= 60m
 
-E2E_GINKGO_PROCS ?= 1
+E2E_GINKGO_PROCS ?= 4
 
 E2E_SPIDERPOOL_ENABLE_SUBNET ?= true
 E2E_SPIDERPOOL_ENABLE_COORDINATOR ?= true

@@ -47,6 +47,7 @@ var (
 	MultusNetworks       = "k8s.v1.cni.cncf.io/networks"
 
 	CalicoCNIName          string = "k8s-pod-network"
+	CiliumCNIName          string = "cilium"
 	MacvlanUnderlayVlan0   string = "macvlan-vlan0-underlay"
 	MacvlanUnderlayVlan100 string = "macvlan-vlan100-underlay"
 	MacvlanUnderlayVlan200 string = "macvlan-vlan200-underlay"
@@ -86,6 +87,11 @@ var (
 const (
 	AutomaticallyCreated = "Automatic"
 	ManuallyCreated      = "Manual"
+)
+
+// Webhook Port
+const (
+	WebhookPort = "5722"
 )
 
 func init() {

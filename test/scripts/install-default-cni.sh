@@ -107,7 +107,7 @@ function install_calico() {
 function install_cilium() {
       echo -e "\033[35m ===> Start to install cilium \033[0m"
       # cni.exclusive using multus-cni need close
-      # kubeProxyReplacement Enhance kube-proxy (value probe static defult: probe)
+      # kubeProxyReplacement Enhance kube-proxy (value probe static default: probe)
       # k8sServiceHost api-server address
       # k8sServicePort api-service port
       # bpf.vlanBypass allow vlan traffic to pass
