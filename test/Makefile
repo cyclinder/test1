@@ -29,9 +29,9 @@ ifeq ($(INSTALL_DEFAULT_CNI),true)
 	E2E_KUBECONFIG=$(E2E_KUBECONFIG)  \
 	E2E_IP_FAMILY=$(E2E_IP_FAMILY) \
 	E2E_CLUSTER_NAME=$(E2E_CLUSTER_NAME) \
-	CALICO_VERSION=$(CALICO_VERSION) \
 	INSTALL_CALICO=$(INSTALL_CALICO) \
 	INSTALL_CILIUM=$(INSTALL_CILIUM) \
+	CALICO_VERSION=$(CALICO_VERSION) \
 	CALICO_IMAGE_REPO=$(CALICO_IMAGE_REPO) \
 	CLUSTER_PATH=$(CLUSTER_DIR)/$(E2E_CLUSTER_NAME) \
 	CALICO_AUTODETECTION_METHOD=$(CALICO_AUTODETECTION_METHOD) \
@@ -58,6 +58,10 @@ ifeq ($(INSTALL_MULTUS),true)
 		MULTUS_CNI_NAMESPACE=$(MULTUS_CNI_NAMESPACE) \
 		CLUSTER_PATH=$(CLUSTER_DIR)/$(E2E_CLUSTER_NAME) \
 		scripts/install-multus.sh $(E2E_CLUSTER_NAME) $(E2E_KUBECONFIG)
+endif
+ifeq ($(INSTALL_KRUISE),true)
+	@echo -e "\033[35m [Step 9] Install third-party controllers: kurise \033[0m"
+	@ make setup_kurise
 endif
 ifeq ($(INSTALL_SPIDERDOCTOR),true)
 	@echo -e "\033[35m [Step 10] Install SpiderDoctor \033[0m"
@@ -105,6 +109,7 @@ setup_kind:
 	-@ rm -rf $(CLUSTER_DIR)/$(E2E_CLUSTER_NAME)
 	- sudo sysctl -w fs.inotify.max_user_watches=524288 || true
 	- sudo sysctl -w fs.inotify.max_user_instances=8192 || true
+	- sudo sysctl net.ipv6.conf.all.disable_ipv6
 	- sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
 	$(QUIET) mkdir -p -v $(CLUSTER_DIR)/$(E2E_CLUSTER_NAME)
 	$(QUIET) kube_proxy_mode=$(E2E_KUBE_PROXY_MODE) ip_family=$(E2E_IP_FAMILY) \
@@ -151,9 +156,13 @@ setup_kurise:
 .PHONY: setup_spiderpool
 setup_spiderpool:
 	@echo "Load Image $(TEST_IMAGE_TAG) to kind..." ; \
-		kind load docker-image ghcr.io/cyclinder/test1/controller:dev-race --name $(E2E_CLUSTER_NAME); \
-		kind load docker-image ghcr.io/cyclinder/test1/agent:dev-race --name $(E2E_CLUSTER_NAME); \
-		kind load docker-image ghcr.io/cyclinder/test2/agent:dev --name $(E2E_CLUSTER_NAME); \
+		for i in $(SPIDERPOOL_IMAGES); do \
+			kind load docker-image $${i}:$(TEST_IMAGE_TAG) --name $(E2E_CLUSTER_NAME);	\
+		done; \
+        # docker pull ghcr.io/cyclinder/test1/controller:dev-race ; \
+        docker pull ghcr.io/cyclinder/test2/agent:dev  ; \
+        # kind load docker-image ghcr.io/cyclinder/test1/controller:dev-race --name $(E2E_CLUSTER_NAME); \
+        kind load docker-image ghcr.io/cyclinder/test2/agent:dev --name $(E2E_CLUSTER_NAME); \
 		if [ "$(USE_TLS_METHOD)" == "certmanager" ] ; then \
 			echo "USE_TLS_METHOD $(USE_TLS_METHOD) " ; \
 			$(QUIET) IMAGE_CERT_MANAGER="$(IMAGE_CERT_MANAGER_NAME)" scripts/install-cert-manager.sh "$(E2E_CLUSTER_NAME)" "$(CERT_MANAGER_ISSUER_NAME)" ; \
@@ -177,12 +186,12 @@ setup_spiderpool:
 		else \
 		  	HELM_OPTION+=" --set feature.coordinator.enabled=false " ; \
 		fi ; \
+		HELM_OPTION+=" --set feature.coordinator.detectIPConflict=false --set feature.coordinator.detectGateway=false " ; \
 		if [ "$(E2E_SPIDERPOOL_ENABLE_SUBNET)" == "true" ] ; then \
 		    HELM_OPTION+=" --set feature.enableSpiderSubnet=true " ; \
 		else \
 		    HELM_OPTION+=" --set feature.enableSpiderSubnet=false " ; \
 		fi ; \
-		HELM_OPTION+=" --set feature.coordinator.detectIPConflict=false --set feature.coordinator.detectGateway=false " ; \
 		HELM_OPTION+=" --set spiderpoolAgent.debug.logLevel=debug --set spiderpoolController.debug.logLevel=debug  " ; \
 		HELM_OPTION+=" --set feature.gc.gcAll.intervalInSecond=120 " ; \
 		if [ "$(E2E_IP_FAMILY)" == "ipv4" ] ; then \
@@ -214,8 +223,8 @@ setup_spiderpool:
 			HELM_OPTION+=" --set clusterDefaultPool.ipv4IPRanges={$${ipv4_ip_range}} --set clusterDefaultPool.ipv6IPRanges={$${ipv6_ip_range}}" ; \
 			HELM_OPTION+=" --set feature.enableIPv4=true --set feature.enableIPv6=true" ; \
 		fi ; \
-		HELM_OPTION+=" --set spiderpoolAgent.prometheus.enabled=false --set spiderpoolController.prometheus.enabled=false " ; \
-		HELM_OPTION+=" --set spiderpoolAgent.prometheus.enabledDebugMetric=false --set spiderpoolController.prometheus.enabledDebugMetric=false " ; \
+		HELM_OPTION+=" --set spiderpoolAgent.prometheus.enabled=true --set spiderpoolController.prometheus.enabled=true " ; \
+		HELM_OPTION+=" --set spiderpoolAgent.prometheus.enabledDebugMetric=true --set spiderpoolController.prometheus.enabledDebugMetric=true " ; \
 		if [ -n "$(PYROSCOPE_LOCAL_PORT)" ] ; then \
         			docker stop $(PYROSCOPE_CONTAINER_NAME) &>/dev/null || true ; \
         			docker rm $(PYROSCOPE_CONTAINER_NAME) &>/dev/null || true ; \
@@ -227,24 +236,24 @@ setup_spiderpool:
         			HELM_OPTION+=" --set spiderpoolAgent.extraEnv[0].name=SPIDERPOOL_PYROSCOPE_PUSH_SERVER_ADDRESS  --set spiderpoolAgent.extraEnv[0].value=http://$${ServerAddress}:$(PYROSCOPE_LOCAL_PORT) " ; \
         			echo "finish setuping pyroscope " ; \
           	 	fi ; \
-		HELM_OPTION+=" --set spiderpoolController.replicas=1 " ; \
-		HELM_OPTION+=" --set spiderpoolAgent.prometheus.serviceMonitor.install=false --set spiderpoolAgent.prometheus.prometheusRule.install=false --set spiderpoolAgent.prometheus.grafanaDashboard.install=false " ; \
-		HELM_OPTION+=" --set spiderpoolController.prometheus.serviceMonitor.install=false --set spiderpoolController.prometheus.prometheusRule.install=false --set spiderpoolController.prometheus.grafanaDashboard.install=false " ; \
+		HELM_OPTION+=" --set spiderpoolController.replicas=2 " ; \
+		HELM_OPTION+=" --set spiderpoolAgent.prometheus.serviceMonitor.install=true --set spiderpoolAgent.prometheus.prometheusRule.install=true --set spiderpoolAgent.prometheus.grafanaDashboard.install=true " ; \
+		HELM_OPTION+=" --set spiderpoolController.prometheus.serviceMonitor.install=true --set spiderpoolController.prometheus.prometheusRule.install=true --set spiderpoolController.prometheus.grafanaDashboard.install=true " ; \
 		echo "setup spiderpool with image $(SPIDERPOOL_AGENT_IMAGE_NAME):$(TEST_IMAGE_TAG) and $(SPIDERPOOL_CONTROLLER_IMAGE_NAME):$(TEST_IMAGE_TAG) " ; \
 		set -x ; \
 		helm upgrade --install $(RELEASE_NAME) $(ROOT_DIR)/charts/spiderpool --wait --debug \
 			-n $(RELEASE_NAMESPACE)  \
-			--set spiderpoolInit.image.registry="" \
-			--set spiderpoolInit.image.repository=ghcr.io/cyclinder/test2/controller \
-			--set spiderpoolInit.image.tag=dev \
 			--set spiderpoolAgent.image.registry="" \
-			--set spiderpoolAgent.image.repository=ghcr.io/cyclinder/test2/agent \
-			--set spiderpoolAgent.image.tag=dev \
+			--set spiderpoolAgent.image.repository=$(SPIDERPOOL_AGENT_IMAGE_NAME) \
+			--set spiderpoolAgent.image.tag=$(TEST_IMAGE_TAG) \
 			--set spiderpoolController.image.registry="" \
-			--set spiderpoolController.image.repository=ghcr.io/cyclinder/test1/controller \
+			--set spiderpoolController.image.repository=$(SPIDERPOOL_CONTROLLER_IMAGE_NAME) \
 			--set spiderpoolController.image.tag=$(TEST_IMAGE_TAG) \
-			--timeout 1m $${HELM_OPTION} \
-			--kubeconfig $(E2E_KUBECONFIG) || { KIND_CLUSTER_NAME=$(E2E_CLUSTER_NAME) ./scripts/debugEnv.sh $(E2E_KUBECONFIG) "detail"   ; exit 1 ; } ; \
+			--set spiderpoolInit.image.registry="" \
+			--set spiderpoolInit.image.repository=$(SPIDERPOOL_CONTROLLER_IMAGE_NAME) \
+			--set spiderpoolInit.image.tag=$(TEST_IMAGE_TAG) \
+			$${HELM_OPTION} \
+			--kubeconfig $(E2E_KUBECONFIG)  || { KIND_CLUSTER_NAME=$(E2E_CLUSTER_NAME) ./scripts/debugEnv.sh $(E2E_KUBECONFIG) "detail"   ; exit 1 ; } ; \
 		exit 0
 
 
@@ -326,12 +335,11 @@ e2e_test:
 		$(ROOT_DIR)/tools/scripts/ginkgo.sh \
 			--race --timeout=$(E2E_TIMEOUT) --output-interceptor-mode=none --poll-progress-after=120s --poll-progress-interval=30s \
 			--json-report e2ereport.json --output-dir $(ROOT_DIR) --procs $(E2E_GINKGO_PROCS) -gcflags=-l \
-			--label-filter="coordinator" -randomize-suites -randomize-all  -vv --fail-fast  $(GINKGO_OPTION) \
+			--label-filter="overlay" -randomize-suites -randomize-all  -vv --fail-fast  $(GINKGO_OPTION) \
 			-r e2e/*  || RESULT=1  ; \
 		kubectl get po -n kube-system --kubeconfig $(E2E_KUBECONFIG) -o wide ; \
 		kubectl describe po -n kube-system -l app.kubernetes.io/component=spiderdoctor-agent --kubeconfig $(E2E_KUBECONFIG) ; \
-		kubectl get nethttp --kubeconfig $(E2E_KUBECONFIG) ; \
-		exit $${RESULT} ; \
+		exit  $${RESULT}; \
 		echo "=========== after test `date` ===========" >> $(E2E_LOG_FILE) ; \
 		./scripts/debugEnv.sh $(E2E_KUBECONFIG) "system" "$(E2E_LOG_FILE)" ; \
 		KIND_CLUSTER_NAME=$(E2E_CLUSTER_NAME) ./scripts/debugEnv.sh $(E2E_KUBECONFIG) "detail" "$(E2E_LOG_FILE)" ; \
